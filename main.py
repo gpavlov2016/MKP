@@ -1,7 +1,7 @@
 import sys
 #jobs = []
 jobs =  {}
-resources = []
+resources = {}
 
 with open('jobs.txt', 'r') as f:
     for line in f:
@@ -27,13 +27,13 @@ f.closed
 with open('resources.txt', 'r') as f:
     for line in f:
         words = line.strip().split(":")
-        resources.append([words[0], int(words[1])])
+        resources[words[0]] = int(words[1])
 f.closed
 
 print jobs
 print resources
 
-
+'''
 def dfs(graph, start):
     visited, stack = set(), [start]
     while stack:
@@ -43,7 +43,7 @@ def dfs(graph, start):
             if 'children' in graph[vertex]:
                 stack.extend(graph[vertex]['children'] - visited)
     return visited
-
+'''
 visited = set()
 for job in jobs:
     if job in visited:
@@ -66,7 +66,76 @@ for job in jobs:
 print 'jobs:'
 print jobs
 
-total_cores = sum([x[1] for x in resources])
+total_cores = sum(resources.values())
 print 'total_cores: ' + str(total_cores)
 
-total
+#capacity - int capacity of the bin
+#tasks - set of task names
+def pack(capacity, tasks, jobs):
+    c = capacity
+    p = set() #pack assignment
+    if not c > 0 or not tasks:
+        return set()
+    if len(tasks) == 1:
+        w = jobs[tasks.pop()]['cores']
+        if w <= c:
+            return tasks    #one task fits remaining capacity
+        else:
+            return set()    #one task is larger than remaining capacity
+    for task in tasks:
+        w = jobs[task]['cores'] #weight
+        if w <= c:
+            p1 = pack(c - w, tasks - set([task]), jobs).union([task])  #include current task
+        else:
+            p1 = set()
+        p2 = pack(c, tasks - set([task]), jobs)                        #exclude current task
+        p1sum = sum([jobs[x]['cores'] for x in p1])
+        p2sum = sum([jobs[x]['cores'] for x in p2])
+        if p1sum > p2sum:
+            p.add(task)
+    return p
+
+#rset - set of resource names
+def cost(rset):
+    return sum([resources[x] for x in rset])
+
+#bins - set of resource names
+#tasks - set of task names
+def choose_bins(bins, tasks):
+    if not bins:
+        return None
+    if len(bins) == 1:
+        c = resources[bins.pop()]   #bin capacity
+        wsum = sum([jobs[x]['cores'] for x in tasks])
+        if wsum == 0:
+            return set()                #no tasks to pack, no bins selected
+        elif wsum <= c:
+            return bins  #packing all remaining resources to the only bin
+        else:
+            return None                 #not enough capacity in the only bin to pack all remaining resources
+
+    b1 = {} #resource name - > resourse name set
+    for rs in bins:
+        p = pack(resources[rs], tasks, jobs)
+        b1[rs] = choose_bins(bins - set([rs]), tasks - p)      #include current bin
+#        b2[rs] = choose_bins(bins - set([rs]), tasks)          # exclude current bin
+    mincost = sys.maxint
+    mnrs = None
+    #find minimum
+    for rs in bins:
+        if b1[rs] != None and cost(b1[rs]) < mincost:
+            mincost = cost(b1[rs])
+            mnrs = rs
+    if mincost == sys.maxint:
+        return None     #cant pack all resources into bins
+    else:
+        return set([mnrs]).union(b1[mnrs])  #concatanate current node with set of nodes from recursive search
+
+
+import time
+
+print "packaging: "
+start = time.time()
+print choose_bins(set(resources.keys()), set(jobs.keys()))
+end = time.time()
+print 'choose_bins(): ' + str(1000*(end - start)) + 'ms'
