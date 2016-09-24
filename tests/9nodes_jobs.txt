@@ -12,8 +12,12 @@ parent_tasks: "task1, task2"
 task4:
 cores_required: 4
 execution_time: 100
-parent_tasks: "task3"
 task5:
 cores_required: 5
 execution_time: 100
-parent_tasks: "task4"
+task6:
+cores_required: 6
+execution_time: 100
+task7:
+cores_required: 7
+execution_time: 100

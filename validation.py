@@ -10,11 +10,32 @@ def validate(schedules, timeline, jobs, resources):
 
     # validate that all jobs are executed
     jobnames = set(jobs.keys())
-    for i in range(schedules):
+    for i in range(len(schedules)):
         schedule = schedules[i]
-        jobnames -= set(schedule.values())
+        for tasks in schedule.values():
+            jobnames -= tasks
     if jobnames:
         print "Validation error, jobs not executed:" + str(jobnames)
-
+'''
 #validate dependencies
+#for each resource build a list of tasks, each cell with start time and end time
+    exec_dict = {}
+    for i in range(len(schedules)):
+        schedule = schedules[i]
+        for (resource, tasks) in schedule.items():
+            if not exec_dict.has_key(resource):
+                exec_dict[resource] = []
+            start = timeline[i]
+            #TODO relax the following constraint to allow better packing:
+            maxduration =
+            end = start +
+
+            exec_dict[resource].append([])
+'''
+#sort according to start time
+#for each resource make sure that there is no contention
+
+
 #validate temporal contention
+
+print "Validation PASSED!"

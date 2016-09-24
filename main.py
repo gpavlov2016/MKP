@@ -170,6 +170,7 @@ print 'choose_bins(): ' + str(1000*(end - start)) + 'ms'
 
 print "scheduling: "
 start = time.time()
+
 #sort jobs according to EST
 sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
 sorted_jobs = [k for (k,v) in sorted_jobs]
@@ -178,6 +179,9 @@ curtime = 0
 rscnow = resources
 for (k, v) in rscnow.items():
     rscnow[k] = [{'job': "", 'endtime': 0, 'id': x} for x in range(v)]  # each core has info about task and endtime
+
+schedule_log = []
+time_log = []
 while sorted_jobs:
     #build free resources dict
     free_resources = {}
@@ -199,11 +203,15 @@ while sorted_jobs:
 
     #schedule all jobs:
     schedule = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
+    new_schedule = schedule
+    if schedule:
+        schedule_log.append(schedule)
+        time_log.append(curtime)
 
+    scheduled_jobs = set()
     #update resources:
     for (k,v) in schedule.items(): #k is the resource name, v is a list of tasks scheduled on the resource
-        while v:
-            task = v.pop()
+        for task in v:
             dur = jobs[task]['time']
             numcores = jobs[task]['cores']
             for core in rscnow[k]:  #core is a dict {'job': "", 'endtime':0}
@@ -217,7 +225,7 @@ while sorted_jobs:
                 print "failed to schedule job " + task + " on resource " + k + ", cores missing: " + str(numcores)
                 #TODO update EST of affected children
             else:
-                #job already removed by pop()ing
+                scheduled_jobs.add(task)    #just for logging
                 print "job " + task + " scheduled on resource " + k
 
     #advance time:
@@ -229,5 +237,10 @@ while sorted_jobs:
 end = time.time()
 print 'Scheduling took: ' + str(1000*(end - start)) + 'ms'
 
-import validation
+from validation import *
+
+start = time.time()
+validate(schedule_log, time_log, jobs, resources)
+end = time.time()
+print 'Validation took: ' + str(1000*(end - start)) + 'ms'
 
