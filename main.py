@@ -146,16 +146,15 @@ def choose_bins(bins, tasks, resources):
     if mincost == sys.maxint:
         return None     #cant pack all resources into bins
     else:
-#        print minassignments
         return minassignments  #return dictionary of bins selected mapped to their task set
 
-
+'''
 def print_assignments(assignemtns):
     for rs in assignemtns.keys():
         print ":" + str(resources[rs]) + ": " + rs
         for task in assignemtns[rs]:
             print "\t:" + str(jobs[task]['cores']) + ": " + task
-
+'''
 
 import time
 
@@ -192,14 +191,15 @@ while sorted_jobs:
 
     #TODO possible heuristic do not aggregate more jobs than avail resources
     ready_jobs = set()
+    next_est = curtime
     while sorted_jobs:
         job = sorted_jobs[0]
         if jobs[job]['est'] <= curtime:
             ready_jobs.add(job)
             sorted_jobs.pop(0)
         else:
+            next_est = jobs[job]['est']
             break
-
 
     #schedule all jobs:
     schedule = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
@@ -209,6 +209,8 @@ while sorted_jobs:
         time_log.append(curtime)
 
     scheduled_jobs = set()
+    if schedule == None:
+        print "Error: unable to schedule at time: " + str(curtime)
     #update resources:
     for (k,v) in schedule.items(): #k is the resource name, v is a list of tasks scheduled on the resource
         for task in v:

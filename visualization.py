@@ -32,7 +32,7 @@ def visualize_schedules(schedules, timeline, jobs, resources):
     rowlen = 50
     scale = (1.0*rowlen)/maxmkspan
     for (resource, l) in exec_dict.items():
-        row = [""] * rowlen
+        row = [" "] * rowlen
         for [start, end] in l:
             scaledstart = int(start*scale)
             scaledend = int(end*scale)
