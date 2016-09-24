@@ -102,13 +102,11 @@ def pack(capacity, tasks, jobs):
 
     return maxpack
 
-#rset - set of resource names
-def cost(rset):
-    return sum([resources[x] for x in rset])
 
 #bins - set of resource names
 #tasks - set of task names
-def choose_bins(bins, tasks):
+#resources - dict of resoure name -> available cores
+def choose_bins(bins, tasks, resources):
 
     if not tasks:
         return {}
@@ -129,24 +127,26 @@ def choose_bins(bins, tasks):
     #Find minimum cost (recursive):
     for rs in bins:
         p = pack(resources[rs], tasks, jobs)
-        if p == None:
+        if not p:
             continue
-        assignments = choose_bins(bins - set([rs]), tasks - p)      #include current bin
-        #        b2[rs] = choose_bins(bins - set([rs]), tasks)          # exclude current bin
+        assignments = choose_bins(bins - set([rs]), tasks - p, resources)      #include current bin
+        #TODO - relax the following requirement to accomaodate partial scheduling:
         if assignments == None:
             continue
 
         if p:
             assignments[rs] = p #add current bin
-        cst = cost(assignments.keys())
-        if cst < mincost:
-            mincost = cst
+
+        cost = sum([resources[x] for x in assignments.keys()])
+        if cost < mincost:
+            mincost = cost
             minrs = rs
             minassignments = assignments
 
     if mincost == sys.maxint:
         return None     #cant pack all resources into bins
     else:
+#        print minassignments
         return minassignments  #return dictionary of bins selected mapped to their task set
 
 
@@ -156,11 +156,78 @@ def print_assignments(assignemtns):
         for task in assignemtns[rs]:
             print "\t:" + str(jobs[task]['cores']) + ": " + task
 
+
 import time
 
+'''
 print "packaging: "
 start = time.time()
 a = choose_bins(set(resources.keys()), set(jobs.keys()))
 end = time.time()
 print_assignments(a)
 print 'choose_bins(): ' + str(1000*(end - start)) + 'ms'
+'''
+
+print "scheduling: "
+start = time.time()
+#sort jobs according to EST
+sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
+sorted_jobs = [k for (k,v) in sorted_jobs]
+print sorted_jobs
+curtime = 0
+rscnow = resources
+for (k, v) in rscnow.items():
+    rscnow[k] = [{'job': "", 'endtime': 0, 'id': x} for x in range(v)]  # each core has info about task and endtime
+while sorted_jobs:
+    #build free resources dict
+    free_resources = {}
+    for (k, v) in rscnow.items():
+        free_cores = sum([core['endtime'] <= curtime for core in v])  # core is a dict {'job': "", 'endtime':0}, v is a list one cell for each core
+        if free_cores > 0:
+            free_resources[k] = free_cores
+
+    #TODO possible heuristic do not aggregate more jobs than avail resources
+    ready_jobs = set()
+    while sorted_jobs:
+        job = sorted_jobs[0]
+        if jobs[job]['est'] <= curtime:
+            ready_jobs.add(job)
+            sorted_jobs.pop(0)
+        else:
+            break
+
+
+    #schedule all jobs:
+    schedule = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
+
+    #update resources:
+    for (k,v) in schedule.items(): #k is the resource name, v is a list of tasks scheduled on the resource
+        while v:
+            task = v.pop()
+            dur = jobs[task]['time']
+            numcores = jobs[task]['cores']
+            for core in rscnow[k]:  #core is a dict {'job': "", 'endtime':0}
+                if core['endtime'] <= curtime:
+                    core['endtime'] = curtime + dur
+                    numcores -= 1
+                    print "run job " + task + " on core " + str(core['id']) + " on resource " + k
+                if numcores == 0:
+                    break
+            if numcores > 0:
+                print "failed to schedule job " + task + " on resource " + k + ", cores missing: " + str(numcores)
+                #TODO update EST of affected children
+            else:
+                #job already removed by pop()ing
+                print "job " + task + " scheduled on resource " + k
+
+    #advance time:
+    curtime += 100
+    print "time:" + str(curtime)
+
+    #TODO possible heuristic predicting optimal increase in time
+
+end = time.time()
+print 'Scheduling took: ' + str(1000*(end - start)) + 'ms'
+
+import validation
+
