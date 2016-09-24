@@ -1,5 +1,5 @@
-compute1: 2
+compute1: 1
 compute2: 2
-compute3: 6
-compute4: 1
-compute5: 3
+compute3: 3
+compute4: 4
+compute5: 5

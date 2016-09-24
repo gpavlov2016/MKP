@@ -74,8 +74,8 @@ print 'total_cores: ' + str(total_cores)
 def pack(capacity, tasks, jobs):
     c = capacity
     p = set() #pack assignment
-    if not c > 0 or not tasks:
-        return set()
+    if not tasks or not c:
+        return set()    #no tasks to pack
     if len(tasks) == 1:
         task = next(iter(tasks))
         w = jobs[task]['cores']
@@ -83,18 +83,24 @@ def pack(capacity, tasks, jobs):
             return tasks    #one task fits remaining capacity
         else:
             return set()    #one task is larger than remaining capacity
+    maxw = 0
+    maxtask = ""
+    maxpack = set()
     for task in tasks:
         w = jobs[task]['cores'] #weight
-        if w <= c:
-            p1 = pack(c - w, tasks - set([task]), jobs).union([task])  #include current task
-        else:
-            p1 = set()
-        p2 = pack(c, tasks - set([task]), jobs)                        #exclude current task
+        if w > c:
+            continue
+        p1 = pack(c - w, tasks - set([task]), jobs) #include current task
+        p1.add(task)
+        #p2 = pack(c, tasks - set([task]), jobs)                        #exclude current task
         p1sum = sum([jobs[x]['cores'] for x in p1])
-        p2sum = sum([jobs[x]['cores'] for x in p2])
-        if p1sum > p2sum:
-            p.add(task)
-    return p
+        #p2sum = sum([jobs[x]['cores'] for x in p2])
+        if p1sum > maxw:
+            maxw = p1sum
+            maxtask = task
+            maxpack = p1
+
+    return maxpack
 
 #rset - set of resource names
 def cost(rset):
@@ -123,6 +129,8 @@ def choose_bins(bins, tasks):
     #Find minimum cost (recursive):
     for rs in bins:
         p = pack(resources[rs], tasks, jobs)
+        if p == None:
+            continue
         assignments = choose_bins(bins - set([rs]), tasks - p)      #include current bin
         #        b2[rs] = choose_bins(bins - set([rs]), tasks)          # exclude current bin
         if assignments == None:
