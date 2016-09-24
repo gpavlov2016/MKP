@@ -15,3 +15,9 @@ execution_time: 100
 task5:
 cores_required: 5
 execution_time: 100
+task6:
+cores_required: 6
+execution_time: 100
+task7:
+cores_required: 7
+execution_time: 100

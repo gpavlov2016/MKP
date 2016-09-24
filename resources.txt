@@ -3,3 +3,7 @@ compute2: 2
 compute3: 3
 compute4: 4
 compute5: 5
+compute6: 6
+compute7: 7
+compute8: 8
+compute9: 9
