@@ -4,12 +4,20 @@ execution_time: 100
 task2:
 cores_required: 2
 execution_time: 200
+parent_tasks: task1
 task3:
 cores_required: 3
 execution_time: 50
+parent_tasks: "task1, task2"
 task4:
 cores_required: 4
 execution_time: 100
 task5:
 cores_required: 5
+execution_time: 100
+task6:
+cores_required: 6
+execution_time: 100
+task7:
+cores_required: 7
 execution_time: 100

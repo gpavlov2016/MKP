@@ -238,9 +238,14 @@ end = time.time()
 print 'Scheduling took: ' + str(1000*(end - start)) + 'ms'
 
 from validation import *
+from visualization import *
 
 start = time.time()
 validate(schedule_log, time_log, jobs, resources)
 end = time.time()
 print 'Validation took: ' + str(1000*(end - start)) + 'ms'
 
+start = time.time()
+visualize_schedules(schedule_log, time_log, jobs, resources)
+end = time.time()
+print 'Visualization took: ' + str(1000*(end - start)) + 'ms'
