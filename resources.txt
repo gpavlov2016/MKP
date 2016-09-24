@@ -1,3 +1,5 @@
 compute1: 2
 compute2: 2
 compute3: 6
+compute4: 1
+compute5: 3

@@ -77,7 +77,8 @@ def pack(capacity, tasks, jobs):
     if not c > 0 or not tasks:
         return set()
     if len(tasks) == 1:
-        w = jobs[tasks.pop()]['cores']
+        task = next(iter(tasks))
+        w = jobs[task]['cores']
         if w <= c:
             return tasks    #one task fits remaining capacity
         else:
@@ -102,40 +103,56 @@ def cost(rset):
 #bins - set of resource names
 #tasks - set of task names
 def choose_bins(bins, tasks):
-    if not bins:
-        return None
+
+    if not tasks:
+        return {}
     if len(bins) == 1:
-        c = resources[bins.pop()]   #bin capacity
+        bin = next(iter(bins))
+        c = resources[bin]   #bin capacity
         wsum = sum([jobs[x]['cores'] for x in tasks])
         if wsum == 0:
-            return set()                #no tasks to pack, no bins selected
+            return {}                #no tasks to pack, no bins selected
         elif wsum <= c:
-            return bins  #packing all remaining resources to the only bin
+            return {bin: tasks}  #packing all remaining resources to the only bin
         else:
             return None                 #not enough capacity in the only bin to pack all remaining resources
 
-    b1 = {} #resource name - > resourse name set
+    mincost = sys.maxint
+    minrs = None
+    minassignments = {}
+    #Find minimum cost (recursive):
     for rs in bins:
         p = pack(resources[rs], tasks, jobs)
-        b1[rs] = choose_bins(bins - set([rs]), tasks - p)      #include current bin
-#        b2[rs] = choose_bins(bins - set([rs]), tasks)          # exclude current bin
-    mincost = sys.maxint
-    mnrs = None
-    #find minimum
-    for rs in bins:
-        if b1[rs] != None and cost(b1[rs]) < mincost:
-            mincost = cost(b1[rs])
-            mnrs = rs
+        assignments = choose_bins(bins - set([rs]), tasks - p)      #include current bin
+        #        b2[rs] = choose_bins(bins - set([rs]), tasks)          # exclude current bin
+        if assignments == None:
+            continue
+
+        if p:
+            assignments[rs] = p #add current bin
+        cst = cost(assignments.keys())
+        if cst < mincost:
+            mincost = cst
+            minrs = rs
+            minassignments = assignments
+
     if mincost == sys.maxint:
         return None     #cant pack all resources into bins
     else:
-        return set([mnrs]).union(b1[mnrs])  #concatanate current node with set of nodes from recursive search
+        return minassignments  #return dictionary of bins selected mapped to their task set
 
+
+def print_assignments(assignemtns):
+    for rs in assignemtns.keys():
+        print ":" + str(resources[rs]) + ": " + rs
+        for task in assignemtns[rs]:
+            print "\t:" + str(jobs[task]['cores']) + ": " + task
 
 import time
 
 print "packaging: "
 start = time.time()
-print choose_bins(set(resources.keys()), set(jobs.keys()))
+a = choose_bins(set(resources.keys()), set(jobs.keys()))
 end = time.time()
+print_assignments(a)
 print 'choose_bins(): ' + str(1000*(end - start)) + 'ms'
