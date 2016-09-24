@@ -30,8 +30,6 @@ with open('resources.txt', 'r') as f:
         resources[words[0]] = int(words[1])
 f.closed
 
-print jobs
-print resources
 
 '''
 def dfs(graph, start):
@@ -63,11 +61,6 @@ for job in jobs:
         else:
             jobs[vertex]['est'] = 0
             visited.add(vertex)
-print 'jobs:'
-print jobs
-
-total_cores = sum(resources.values())
-print 'total_cores: ' + str(total_cores)
 
 #capacity - int capacity of the bin
 #tasks - set of task names
@@ -109,19 +102,18 @@ def pack(capacity, tasks, jobs):
 def choose_bins(bins, tasks, resources):
 
     if not tasks:
-        return {}
+        return {}, tasks
     if len(bins) == 1:
         bin = next(iter(bins))
         c = resources[bin]   #bin capacity
         wsum = sum([jobs[x]['cores'] for x in tasks])
-        if wsum == 0:
-            return {}                #no tasks to pack, no bins selected
-        elif wsum <= c:
-            return {bin: tasks}  #packing all remaining resources to the only bin
+        p = pack(c, tasks, jobs)
+        if not p:
+            return {}, tasks
         else:
-            return None                 #not enough capacity in the only bin to pack all remaining resources
+            return {bin: p}, tasks - p  #pack the max number of tasks in the only bin and calculate the rest
 
-    mincost = sys.maxint
+    minnonpacked = sys.maxint
     minrs = None
     minassignments = {}
     #Find minimum cost (recursive):
@@ -129,24 +121,45 @@ def choose_bins(bins, tasks, resources):
         p = pack(resources[rs], tasks, jobs)
         if not p:
             continue
-        assignments = choose_bins(bins - set([rs]), tasks - p, resources)      #include current bin
-        #TODO - relax the following requirement to accomaodate partial scheduling:
-        if assignments == None:
-            continue
-
+        newbins = bins - set([rs])
+        newtasks = tasks - p
+        assignments, leftovers = choose_bins(newbins, newtasks, resources)      #include current bin
+        #TODO - there are 2 criteria that we can optimize for:
+        #       - minimum resources used#        cost = sum([resources[x] for x in assignments.keys()])
+        #       - maximum tasks packed
         if p:
             assignments[rs] = p #add current bin
-
-        cost = sum([resources[x] for x in assignments.keys()])
-        if cost < mincost:
-            mincost = cost
+        nonpackedsum = sum([jobs[x]['cores'] for x in leftovers])
+        if nonpackedsum < minnonpacked:
+            minnonpacked = nonpackedsum
             minrs = rs
             minassignments = assignments
 
-    if mincost == sys.maxint:
-        return None     #cant pack all resources into bins
-    else:
-        return minassignments  #return dictionary of bins selected mapped to their task set
+    packedjobs = set()
+    for taskset in minassignments.values():
+        packedjobs = packedjobs.union(taskset)
+
+    return minassignments, tasks - packedjobs  #return dictionary of bins selected mapped to their task set
+
+def update_resources(schedule, cur_resources):
+    for (k, v) in schedule.items():  # k is the resource name, v is a list of tasks scheduled on the resource
+        for task in v:
+            dur = jobs[task]['time']
+            numcores = jobs[task]['cores']
+            for core in cur_resources[k]:  # core is a dict {'job': "", 'endtime':0}
+                if core['endtime'] <= curtime:
+                    core['endtime'] = curtime + dur
+                    numcores -= 1
+                    #print "run job " + task + " on core " + str(core['id']) + " on resource " + k
+                if numcores == 0:
+                    break
+            if numcores > 0:
+                print "failed to schedule job " + task + " on resource " + k + ", cores missing: " + str(numcores)
+                # TODO update EST of affected children
+            else:
+                scheduled_jobs.add(task)  # just for logging
+                print task + ": " + k
+
 
 '''
 def print_assignments(assignemtns):
@@ -167,13 +180,15 @@ print_assignments(a)
 print 'choose_bins(): ' + str(1000*(end - start)) + 'ms'
 '''
 
+total_cores = sum(resources.values())
+print 'total_cores: ' + str(total_cores)
+
 print "scheduling: "
 start = time.time()
 
 #sort jobs according to EST
 sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
 sorted_jobs = [k for (k,v) in sorted_jobs]
-print sorted_jobs
 curtime = 0
 rscnow = resources
 for (k, v) in rscnow.items():
@@ -182,14 +197,7 @@ for (k, v) in rscnow.items():
 schedule_log = []
 time_log = []
 while sorted_jobs:
-    #build free resources dict
-    free_resources = {}
-    for (k, v) in rscnow.items():
-        free_cores = sum([core['endtime'] <= curtime for core in v])  # core is a dict {'job': "", 'endtime':0}, v is a list one cell for each core
-        if free_cores > 0:
-            free_resources[k] = free_cores
-
-    #TODO possible heuristic do not aggregate more jobs than avail resources
+    #TODO - possible heuristic do not aggregate more jobs than avail resources
     ready_jobs = set()
     next_est = curtime
     while sorted_jobs:
@@ -201,40 +209,32 @@ while sorted_jobs:
             next_est = jobs[job]['est']
             break
 
-    #schedule all jobs:
-    schedule = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
-    new_schedule = schedule
-    if schedule:
-        schedule_log.append(schedule)
-        time_log.append(curtime)
+    while (ready_jobs):
+        # build free resources dict
+        free_resources = {}
+        for (k, v) in rscnow.items():
+            #core is a dict {'job': "", 'endtime':0}, v is a list one cell for each core
+            free_cores = sum([core['endtime'] <= curtime for core in v])
+            if free_cores > 0:
+                free_resources[k] = free_cores
+        if free_resources:
+            #schedule max amount of jobs:
+            schedule, leftovers = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
+            if schedule:
+                schedule_log.append(schedule)
+                time_log.append(curtime)
 
-    scheduled_jobs = set()
-    if schedule == None:
-        print "Error: unable to schedule at time: " + str(curtime)
-    #update resources:
-    for (k,v) in schedule.items(): #k is the resource name, v is a list of tasks scheduled on the resource
-        for task in v:
-            dur = jobs[task]['time']
-            numcores = jobs[task]['cores']
-            for core in rscnow[k]:  #core is a dict {'job': "", 'endtime':0}
-                if core['endtime'] <= curtime:
-                    core['endtime'] = curtime + dur
-                    numcores -= 1
-                    print "run job " + task + " on core " + str(core['id']) + " on resource " + k
-                if numcores == 0:
-                    break
-            if numcores > 0:
-                print "failed to schedule job " + task + " on resource " + k + ", cores missing: " + str(numcores)
-                #TODO update EST of affected children
-            else:
-                scheduled_jobs.add(task)    #just for logging
-                print "job " + task + " scheduled on resource " + k
+            scheduled_jobs = set()
+            if schedule == None:
+                print "Error: unable to schedule at time: " + str(curtime)
+            #update resources:
+            update_resources(schedule, rscnow)
+            ready_jobs = leftovers
+        #advance time:
+        curtime += 100
+        print "Time: " + str(curtime)
+        #TODO - possible heuristic predicting optimal increase in time
 
-    #advance time:
-    curtime += 100
-    print "time:" + str(curtime)
-
-    #TODO possible heuristic predicting optimal increase in time
 
 end = time.time()
 print 'Scheduling took: ' + str(1000*(end - start)) + 'ms'
