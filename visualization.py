@@ -3,13 +3,14 @@ print "Visualization"
 rowlen = 50
 
 
-def visualize_item(row, start, end, makespan):
+def visualize_item(row, start, end, makespan, task):
     scale = (1.0 * rowlen) / makespan
 
     scaledstart = int(start * scale)
     scaledend = int(end * scale)
     row[scaledstart] = "|"
-    row[scaledstart + 1:scaledend] = "x" * (scaledend - scaledstart)
+    row[scaledstart + 1:scaledend] = "." * (scaledend - scaledstart - 2)
+    row[scaledstart + 1:min(scaledend, len(task))] = list(task)[:min(len(task), scaledend-scaledstart)]
     row[scaledend] = "|"
 
 
@@ -31,7 +32,7 @@ def visualize_schedules(schedules, timeline, jobs, resources):
                 duration = jobs[task]['time']
                 cores = jobs[task]['cores']
                 end = start + duration
-                exec_unit = {'start': start, 'end': end, 'cores': cores}
+                exec_unit = {'start': start, 'end': end, 'cores': cores, 'task': task}
                 exec_dict[resource].append(exec_unit)
 
     makespan = 0
@@ -61,7 +62,8 @@ def visualize_schedules(schedules, timeline, jobs, resources):
                     row = cores_vis[cores_availability[0][1]]
                     start = exec_list[exec_item_idx]['start']
                     end = exec_list[exec_item_idx]['end']
-                    visualize_item(row, start, end, makespan)
+                    task = exec_list[exec_item_idx]['task']
+                    visualize_item(row, start, end, makespan, task)
                     cores_availability[0][0] = exec_list[exec_item_idx]['end']
         print "\t\t" + "%-10s" % (resource + ":")
         for i in range(numcores):
@@ -72,4 +74,4 @@ def visualize_schedules(schedules, timeline, jobs, resources):
     scale = (1.0 * rowlen) / makespan
     for i in range(0, rowlen+axis_interval, axis_interval):
         xaxis += "%-5s" % str(int(i/scale))
-    print "\t\t\t\t  " + xaxis
+    print "\t\t\t\t    " + xaxis
