@@ -7,6 +7,7 @@ execution_time: 200
 task3:
 cores_required: 3
 execution_time: 50
+parent_tasks: "task2"
 task4:
 cores_required: 4
 execution_time: 100

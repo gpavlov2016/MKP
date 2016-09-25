@@ -4,6 +4,7 @@ print "Validation"
 #each schedule item is a dict mapping resource --> set of tasks executed on it
 #timeline is list of time values corresponding to each of the schedules
 def validate(schedules, timeline, jobs, resources):
+    res = True
 
     if len(schedules) != len(timeline):
         print "Validate() error: schedule and timeline mismatch"
@@ -17,9 +18,11 @@ def validate(schedules, timeline, jobs, resources):
             jobnames -= tasks
     if jobnames:
         print "Validation error, jobs not executed:" + str(jobnames)
+        res = False
 
     #for each resource build a list of tasks, each cell with start time and end time
     exec_dict = {}
+    task_dict = {}  #maps tasks to its execution item (start, end, cores)
     for i in range(len(schedules)):
         schedule = schedules[i]
         for (resource, tasks) in schedule.items():
@@ -31,6 +34,11 @@ def validate(schedules, timeline, jobs, resources):
                 cores = jobs[task]['cores']
                 end = start + duration
                 exec_unit = {'start': start, 'end': end, 'cores': cores}
+                if task_dict.has_key(task):
+                    print "Validation error, task already scheduled: task: " + task
+                    res = False
+                else:
+                    task_dict[task] = exec_unit
                 exec_dict[resource].append(exec_unit)
 
     # for each resource make sure that there is no contention
@@ -46,11 +54,23 @@ def validate(schedules, timeline, jobs, resources):
                 next_avail = cores_availability[0]
                 if next_avail > exec_list[exec_item_idx]['start']:
                     print "Validation error - temporal contention, resouce: " + resource + " time: " + str(exec_list[exec_item_idx])
+                    res = False
                 else:
                     cores_availability[0] = exec_list[exec_item_idx]['end']
 
+    #validate dependencies
 
+    for job in jobs.keys():
+        if not 'parents' in jobs[job]:
+            continue
+        parents = jobs[job]['parents']
+        parents_finish_time = max([task_dict[x]['end'] for x in parents])
+        start = task_dict[job]['start']
+        if start < parents_finish_time:
+            print "Validation error, dependency violated: job: " + job + ", parents: " + str(parents)
+            res = False
 
-#validate dependencies
-
-print "Validation PASSED!"
+    if res:
+        print "Validation PASSED!"
+    else:
+        print "Validation FAILED!"
