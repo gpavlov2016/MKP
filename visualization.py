@@ -9,8 +9,12 @@ def visualize_item(row, start, end, makespan, task):
     scaledstart = int(start * scale)
     scaledend = min(rowlen-1, int(end * scale))
     row[scaledstart] = "|"
-    for i in range(scaledstart+1, scaledend-1):
-        row[i] = "."
+    for i in range(scaledstart+1, scaledend):
+        local_idx = i - (scaledstart+1)
+        if local_idx < len(task):
+            row[i] = task[local_idx]
+        else:
+            row[i] = "."
     #row[scaledstart + 1:min(scaledend, len(task))] = list(task)[:min(len(task), scaledend-scaledstart)]
     row[scaledend] = "|"
 
