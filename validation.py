@@ -18,7 +18,7 @@ def validate(schedules, timeline, jobs, resources):
     if jobnames:
         print "Validation error, jobs not executed:" + str(jobnames)
 
-#for each resource build a list of tasks, each cell with start time and end time
+    #for each resource build a list of tasks, each cell with start time and end time
     exec_dict = {}
     for i in range(len(schedules)):
         schedule = schedules[i]
@@ -27,18 +27,30 @@ def validate(schedules, timeline, jobs, resources):
                 exec_dict[resource] = []
             start = timeline[i]
             #TODO relax the following constraint to allow better packing:
-            durations = [jobs[x]['time'] for x in tasks]
-            maxduration = max(durations)
-            end = start + maxduration
-            exec_dict[resource].append([start, end])
+            for task in tasks:
+                duration = jobs[task]['time']
+                cores = jobs[task]['cores']
+                end = start + duration
+                exec_unit = {'start': start, 'end': end, 'cores': cores}
+                exec_dict[resource].append(exec_unit)
 
     # for each resource make sure that there is no contention
-    for (resource, l) in exec_dict.items():
+    for (resource, exec_list) in exec_dict.items():
         # sort in ascending start time order
-        l.sort
-        for i in range(1, len(l)):
-            if l[i][0] < l[i-1][1]:     #current start < prev end
-                print "Validation error - temporal contention, resouce: " + resource + " time: " + str(l[i])
+        sorted(exec_list, key=lambda x: x['start'])
+        numcores = resources[resource]
+        cores_availability = [0 for x in range(numcores)]   #list of times at which each core is available
+        for exec_item_idx in range(0, len(exec_list)):
+            cores_required = exec_list[exec_item_idx]['cores']
+            for core_idx in range(cores_required):
+                cores_availability.sort()
+                next_avail = cores_availability[0]
+                if next_avail > exec_list[exec_item_idx]['start']:
+                    print "Validation error - temporal contention, resouce: " + resource + " time: " + str(exec_list[exec_item_idx])
+                else:
+                    cores_availability[0] = exec_list[exec_item_idx]['end']
+
+
 
 #validate dependencies
 

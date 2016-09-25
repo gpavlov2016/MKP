@@ -106,7 +106,6 @@ def choose_bins(bins, tasks, resources):
     if len(bins) == 1:
         bin = next(iter(bins))
         c = resources[bin]   #bin capacity
-        wsum = sum([jobs[x]['cores'] for x in tasks])
         p = pack(c, tasks, jobs)
         if not p:
             return {}, tasks
@@ -141,65 +140,56 @@ def choose_bins(bins, tasks, resources):
 
     return minassignments, tasks - packedjobs  #return dictionary of bins selected mapped to their task set
 
-def update_resources(schedule, cur_resources):
-    for (k, v) in schedule.items():  # k is the resource name, v is a list of tasks scheduled on the resource
-        for task in v:
+#schedule - dict of resource mapped to tasks
+def update_resources(schedule, cores_availability, curtime):
+    for (resource, tasks) in schedule.items():
+        for task in tasks:
             dur = jobs[task]['time']
             numcores = jobs[task]['cores']
-            for core in cur_resources[k]:  # core is a dict {'job': "", 'endtime':0}
-                if core['endtime'] <= curtime:
-                    core['endtime'] = curtime + dur
-                    numcores -= 1
-                    #print "run job " + task + " on core " + str(core['id']) + " on resource " + k
-                if numcores == 0:
+            for core in range(numcores):
+                core_avail_list = cores_availability[resource]
+                core_avail_list.sort()
+                if core_avail_list[0] > curtime:
+                    print "Update resource failed, all cores are busy: task: " \
+                          + task + ", resource: " + resource + ", time: " + str(curtime)
                     break
-            if numcores > 0:
-                print "failed to schedule job " + task + " on resource " + k + ", cores missing: " + str(numcores)
-                # TODO update EST of affected children
-            else:
-                scheduled_jobs.add(task)  # just for logging
-                print task + ": " + k
+                else:
+                    core_avail_list[0] += dur
+                    #scheduled_jobs.add(task)  # just for logging
+                    print task + ": " + resource
 
 
-'''
-def print_assignments(assignemtns):
-    for rs in assignemtns.keys():
-        print ":" + str(resources[rs]) + ": " + rs
-        for task in assignemtns[rs]:
-            print "\t:" + str(jobs[task]['cores']) + ": " + task
-'''
+def update_est(tasks, howlong):
+    for task in tasks:
+        jobs[task]['est'] += howlong
+        update_est(jobs[task]['children'], howlong)
 
 import time
 
-'''
-print "packaging: "
-start = time.time()
-a = choose_bins(set(resources.keys()), set(jobs.keys()))
-end = time.time()
-print_assignments(a)
-print 'choose_bins(): ' + str(1000*(end - start)) + 'ms'
-'''
-
 total_cores = sum(resources.values())
-print 'total_cores: ' + str(total_cores)
+print 'Total cores: ' + str(total_cores)
 
-print "scheduling: "
+print "Scheduling: "
 start = time.time()
 
 #sort jobs according to EST
 sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
 sorted_jobs = [k for (k,v) in sorted_jobs]
 curtime = 0
-rscnow = resources
-for (k, v) in rscnow.items():
-    rscnow[k] = [{'job': "", 'endtime': 0, 'id': x} for x in range(v)]  # each core has info about task and endtime
+
+cores_availability = {}  # resource name --> list of availability times for each core
+for (resource, numcores) in resources.items():
+    cores_availability[resource] = [0 for x in range(numcores)] #resource name --> list of availability times for each core
 
 schedule_log = []
 time_log = []
 while sorted_jobs:
-    #TODO - possible heuristic do not aggregate more jobs than avail resources
+    # sort jobs according to EST
+
+    sorted_jobs = sorted(sorted_jobs, key=lambda x: jobs[x]['est'])
+
+    #TODO - match resourcees and ready jobs
     ready_jobs = set()
-    next_est = curtime
     while sorted_jobs:
         job = sorted_jobs[0]
         if jobs[job]['est'] <= curtime:
@@ -212,11 +202,11 @@ while sorted_jobs:
     while (ready_jobs):
         # build free resources dict
         free_resources = {}
-        for (k, v) in rscnow.items():
+        for (resource, core_avail_list) in cores_availability.items():
             #core is a dict {'job': "", 'endtime':0}, v is a list one cell for each core
-            free_cores = sum([core['endtime'] <= curtime for core in v])
+            free_cores = sum([core_avail_list[i] <= curtime for i in range(len(core_avail_list))])
             if free_cores > 0:
-                free_resources[k] = free_cores
+                free_resources[resource] = free_cores
         if free_resources:
             #schedule max amount of jobs:
             schedule, leftovers = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
@@ -228,10 +218,17 @@ while sorted_jobs:
             if schedule == None:
                 print "Error: unable to schedule at time: " + str(curtime)
             #update resources:
-            update_resources(schedule, rscnow)
+            update_resources(schedule, cores_availability, curtime)
             ready_jobs = leftovers
+        flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
+        flat_core_avail.sort()
         #advance time:
-        curtime += 100
+        prevtime = curtime
+        for x in flat_core_avail:
+            if x > curtime:
+                curtime = x
+                break
+        update_est(leftovers, curtime - prevtime)
         print "Time: " + str(curtime)
         #TODO - possible heuristic predicting optimal increase in time
 
