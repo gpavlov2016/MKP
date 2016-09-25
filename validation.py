@@ -26,7 +26,6 @@ def validate(schedules, timeline, jobs, resources):
             if not exec_dict.has_key(resource):
                 exec_dict[resource] = []
             start = timeline[i]
-            #TODO relax the following constraint to allow better packing:
             for task in tasks:
                 duration = jobs[task]['time']
                 cores = jobs[task]['cores']
