@@ -1,6 +1,6 @@
 print "Visualization"
 
-rowlen = 50
+rowlen = 80
 
 
 def visualize_item(row, start, end, makespan, task):
@@ -9,8 +9,9 @@ def visualize_item(row, start, end, makespan, task):
     scaledstart = int(start * scale)
     scaledend = min(rowlen-1, int(end * scale))
     row[scaledstart] = "|"
-    row[scaledstart + 1:scaledend] = "." * (scaledend - scaledstart - 2)
-    row[scaledstart + 1:min(scaledend, len(task))] = list(task)[:min(len(task), scaledend-scaledstart)]
+    for i in range(scaledstart+1, scaledend-1):
+        row[i] = "."
+    #row[scaledstart + 1:min(scaledend, len(task))] = list(task)[:min(len(task), scaledend-scaledstart)]
     row[scaledend] = "|"
 
 
@@ -49,6 +50,7 @@ def visualize_schedules(schedules, timeline, jobs, resources):
         numcores = resources[resource]
         cores_availability = [[0, x] for x in range(numcores)]   #list of times at which each core is available
         cores_vis = [[" "] * rowlen for x in range(numcores)]
+        cores_utilization = [0 for x in range(numcores)]
         for exec_item_idx in range(0, len(exec_list)):
             cores_required = exec_list[exec_item_idx]['cores']
             for core_idx in range(cores_required):
@@ -62,10 +64,13 @@ def visualize_schedules(schedules, timeline, jobs, resources):
                     end = exec_list[exec_item_idx]['end']
                     task = exec_list[exec_item_idx]['task']
                     visualize_item(row, start, end, makespan, task)
+                    cores_utilization[cores_availability[0][1]] += end - start
                     cores_availability[0][0] = exec_list[exec_item_idx]['end']
         print "\t\t" + "%-10s" % (resource + ":")
         for i in range(numcores):
-            print "\t\t\t" + "core%-4s" % (str(i) + ":") + ''.join(cores_vis[i])
+            perc_utilization = (100.0*cores_utilization[i])/makespan
+            print "\t\t\t" + "core%-4s" % (str(i) + ":") + ''.join(cores_vis[i]) + \
+                  " " + str(int(perc_utilization)) + "%"
 
     xaxis = ""
     axis_interval = 5
