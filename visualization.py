@@ -7,7 +7,7 @@ def visualize_item(row, start, end, makespan, task):
     scale = (1.0 * rowlen) / makespan
 
     scaledstart = int(start * scale)
-    scaledend = int(end * scale)
+    scaledend = min(rowlen-1, int(end * scale))
     row[scaledstart] = "|"
     row[scaledstart + 1:scaledend] = "." * (scaledend - scaledstart - 2)
     row[scaledstart + 1:min(scaledend, len(task))] = list(task)[:min(len(task), scaledend-scaledstart)]
@@ -42,8 +42,6 @@ def visualize_schedules(schedules, timeline, jobs, resources):
         maxtime = max(dictlist, key=lambda x: x['end'])['end'] #max end time for all the exec items in the list
         makespan = max(maxtime, makespan)
 
-    print "Makespan: " + str(makespan)
-
     # for each resource draw the execution line
     for (resource, exec_list) in exec_dict.items():
         # sort in ascending start time order
@@ -75,3 +73,5 @@ def visualize_schedules(schedules, timeline, jobs, resources):
     for i in range(0, rowlen+axis_interval, axis_interval):
         xaxis += "%-5s" % str(int(i/scale))
     print "\t\t\t\t    " + xaxis
+
+    print "Makespan: " + str(makespan)

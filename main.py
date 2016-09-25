@@ -1,12 +1,25 @@
 import sys
-#jobs = []
-jobs =  {}
-resources = {}
 
-with open('jobs.txt', 'r') as f:
+
+def parse_input(jobstr = None, resourcestr = None):
+    jobs =  {}
+    resources = {}
+
+    if jobstr == None:
+        filename = 'jobs.txt'
+        f = open(filename, 'r')
+        if not f:
+            print "Error oppening file: " + filename
+            return jobs, resources
+    else:
+        f = jobstr.split("\n")
+
     for line in f:
         words = line.strip().split(":")
-        if words[1] == '':
+        if not words or words == ['']:
+            continue    #empty line
+
+        if len(words) == 1 or words[1] == '':
             job = words[0]
             jobs[job] = {'children': set(), 'est': 0, 'lst': 0}
         elif words[0] == 'cores_required':
@@ -22,45 +35,50 @@ with open('jobs.txt', 'r') as f:
         else:
             print("Jobs file parsing error: " + ', '.join(words))
             exit()
-f.closed
+    if jobstr == None:
+        f.closed
 
-with open('resources.txt', 'r') as f:
+    if jobstr == None:
+        filename = 'resources.txt'
+        f = open(filename, 'r')
+        if not f:
+            print "Error oppening file: " + filename
+            return jobs, resources
+    else:
+        f = resourcestr.split("\n")
+
     for line in f:
         words = line.strip().split(":")
+        if not words or len(words) < 2:
+            continue    #empty line
         resources[words[0]] = int(words[1])
-f.closed
 
+    if resourcestr == None:
+        f.closed
 
-'''
-def dfs(graph, start):
-    visited, stack = set(), [start]
-    while stack:
-        vertex = stack.pop()
-        if vertex not in visited:
-            visited.add(vertex)
-            if 'children' in graph[vertex]:
-                stack.extend(graph[vertex]['children'] - visited)
-    return visited
-'''
-visited = set()
-for job in jobs:
-    if job in visited:
-        continue
-    stack = [job]
-    while stack:
-        vertex = stack.pop()
-        if 'parents' in jobs[vertex]:
-            prnts_notvisited = [x for x in jobs[vertex]['parents'] if x not in visited]
-            prnts_visited = [x for x in jobs[vertex]['parents'] if x in visited]
-            if len(prnts_notvisited) == 0:
-                jobs[vertex]['est'] = max([jobs[x]['est'] + jobs[x]['time'] for x in prnts_visited])
-                visited.add(vertex)
+    return jobs, resources
+
+#update the est field in each job dictionary value
+def calc_est(jobs):
+    visited = set()
+    for job in jobs:
+        if job in visited:
+            continue
+        stack = [job]
+        while stack:
+            vertex = stack.pop()
+            if 'parents' in jobs[vertex]:
+                prnts_notvisited = [x for x in jobs[vertex]['parents'] if x not in visited]
+                prnts_visited = [x for x in jobs[vertex]['parents'] if x in visited]
+                if len(prnts_notvisited) == 0:
+                    jobs[vertex]['est'] = max([jobs[x]['est'] + jobs[x]['time'] for x in prnts_visited])
+                    visited.add(vertex)
+                else:
+                    stack.append(vertex)
+                    stack += prnts_notvisited
             else:
-                stack.append(vertex)
-                stack += prnts_notvisited
-        else:
-            jobs[vertex]['est'] = 0
-            visited.add(vertex)
+                jobs[vertex]['est'] = 0
+                visited.add(vertex)
 
 #capacity - int capacity of the bin
 #tasks - set of task names
@@ -99,7 +117,7 @@ def pack(capacity, tasks, jobs):
 #bins - set of resource names
 #tasks - set of task names
 #resources - dict of resoure name -> available cores
-def choose_bins(bins, tasks, resources):
+def choose_bins(bins, tasks, jobs, resources):
 
     if not tasks:
         return {}, tasks
@@ -122,7 +140,7 @@ def choose_bins(bins, tasks, resources):
             continue
         newbins = bins - set([rs])
         newtasks = tasks - p
-        assignments, leftovers = choose_bins(newbins, newtasks, resources)      #include current bin
+        assignments, leftovers = choose_bins(newbins, newtasks, jobs, resources)      #include current bin
         #TODO - there are 2 criteria that we can optimize for:
         #       - minimum resources used#        cost = sum([resources[x] for x in assignments.keys()])
         #       - maximum tasks packed
@@ -141,7 +159,7 @@ def choose_bins(bins, tasks, resources):
     return minassignments, tasks - packedjobs  #return dictionary of bins selected mapped to their task set
 
 #schedule - dict of resource mapped to tasks
-def update_resources(schedule, cores_availability, curtime):
+def update_resources(schedule, cores_availability, curtime, jobs):
     for (resource, tasks) in schedule.items():
         for task in tasks:
             dur = jobs[task]['time']
@@ -159,92 +177,71 @@ def update_resources(schedule, cores_availability, curtime):
                     print task + ": " + resource
 
 
-def update_est(tasks, howlong):
+def update_est(tasks, howlong, jobs):
     for task in tasks:
         jobs[task]['est'] += howlong
-        update_est(jobs[task]['children'], howlong)
+        update_est(jobs[task]['children'], howlong, jobs)
 
-import time
+def schedule_jobs(jobs, resources):
+    #sort jobs according to EST
+    sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
+    sorted_jobs = [k for (k,v) in sorted_jobs]
+    curtime = 0
 
-total_cores = sum(resources.values())
-print 'Total cores: ' + str(total_cores)
+    cores_availability = {}  # resource name --> list of availability times for each core
+    for (resource, numcores) in resources.items():
+        cores_availability[resource] = [0 for x in range(numcores)] #resource name --> list of availability times for each core
 
-print "Scheduling: "
-start = time.time()
-
-#sort jobs according to EST
-sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
-sorted_jobs = [k for (k,v) in sorted_jobs]
-curtime = 0
-
-cores_availability = {}  # resource name --> list of availability times for each core
-for (resource, numcores) in resources.items():
-    cores_availability[resource] = [0 for x in range(numcores)] #resource name --> list of availability times for each core
-
-schedule_log = []
-time_log = []
-while sorted_jobs:
-    # sort jobs according to EST
-
-    sorted_jobs = sorted(sorted_jobs, key=lambda x: jobs[x]['est'])
-
-    #TODO - match resourcees and ready jobs
-    ready_jobs = set()
+    schedule_log = []
+    time_log = []
     while sorted_jobs:
-        job = sorted_jobs[0]
-        if jobs[job]['est'] <= curtime:
-            ready_jobs.add(job)
-            sorted_jobs.pop(0)
-        else:
-            next_est = jobs[job]['est']
-            break
+        # sort jobs according to EST
 
-    while (ready_jobs):
-        # build free resources dict
-        free_resources = {}
-        for (resource, core_avail_list) in cores_availability.items():
-            #core is a dict {'job': "", 'endtime':0}, v is a list one cell for each core
-            free_cores = sum([core_avail_list[i] <= curtime for i in range(len(core_avail_list))])
-            if free_cores > 0:
-                free_resources[resource] = free_cores
-        if free_resources:
-            #schedule max amount of jobs:
-            schedule, leftovers = choose_bins(set(free_resources.keys()), ready_jobs, free_resources)
-            if schedule:
-                schedule_log.append(schedule)
-                time_log.append(curtime)
+        sorted_jobs = sorted(sorted_jobs, key=lambda x: jobs[x]['est'])
 
-            scheduled_jobs = set()
-            if schedule == None:
-                print "Error: unable to schedule at time: " + str(curtime)
-            #update resources:
-            update_resources(schedule, cores_availability, curtime)
-            ready_jobs = leftovers
-        flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
-        flat_core_avail.sort()
-        #advance time:
-        prevtime = curtime
-        for x in flat_core_avail:
-            if x > curtime:
-                curtime = x
+        #TODO - match resourcees and ready jobs
+        ready_jobs = set()
+        while sorted_jobs:
+            job = sorted_jobs[0]
+            if jobs[job]['est'] <= curtime:
+                ready_jobs.add(job)
+                sorted_jobs.pop(0)
+            else:
+                next_est = jobs[job]['est']
                 break
-        update_est(leftovers, curtime - prevtime)
-        print "Time: " + str(curtime)
-        #TODO - possible heuristic predicting optimal increase in time
 
+        while (ready_jobs):
+            # build free resources dict
+            free_resources = {}
+            for (resource, core_avail_list) in cores_availability.items():
+                #core is a dict {'job': "", 'endtime':0}, v is a list one cell for each core
+                free_cores = sum([core_avail_list[i] <= curtime for i in range(len(core_avail_list))])
+                if free_cores > 0:
+                    free_resources[resource] = free_cores
+            if free_resources:
+                #schedule max amount of jobs:
+                schedule, leftovers = choose_bins(set(free_resources.keys()), ready_jobs, jobs, free_resources)
+                if schedule:
+                    schedule_log.append(schedule)
+                    time_log.append(curtime)
 
-end = time.time()
-print 'Scheduling took: ' + str(1000*(end - start)) + 'ms'
+                scheduled_jobs = set()
+                if schedule == None:
+                    print "Error: unable to schedule at time: " + str(curtime)
+                #update resources:
+                update_resources(schedule, cores_availability, curtime, jobs)
+                ready_jobs = leftovers
+            flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
+            flat_core_avail.sort()
+            #advance time:
+            prevtime = curtime
+            for x in flat_core_avail:
+                if x > curtime:
+                    curtime = x
+                    break
+            update_est(leftovers, curtime - prevtime, jobs)
+            print "Time: " + str(curtime)
+            #TODO - possible heuristic predicting optimal increase in time
 
-from validation import *
-from visualization import *
+    return schedule_log, time_log
 
-start = time.time()
-validate(schedule_log, time_log, jobs, resources)
-end = time.time()
-print 'Validation took: ' + str(1000*(end - start)) + 'ms'
-
-start = time.time()
-visualize_schedules(schedule_log, time_log, jobs, resources)
-end = time.time()
-print 'Visualization took: ' + str(1000*(end - start)) + 'ms'
