@@ -74,8 +74,12 @@ def calc_est(jobs):
                     jobs[vertex]['est'] = max([jobs[x]['est'] + jobs[x]['time'] for x in prnts_visited])
                     visited.add(vertex)
                 else:
-                    stack.append(vertex)
-                    stack += prnts_notvisited
+                    if vertex in stack:
+                        print "EST calculation error: circular dependencies detected: " + str(stack)
+                        exit(1)
+                    else:
+                        stack.append(vertex)
+                        stack += prnts_notvisited
             else:
                 jobs[vertex]['est'] = 0
                 visited.add(vertex)
@@ -200,6 +204,7 @@ def schedule_jobs(jobs, resources):
 
         #TODO - match resourcees and ready jobs
         ready_jobs = set()
+        next_est = curtime
         while sorted_jobs:
             job = sorted_jobs[0]
             if jobs[job]['est'] <= curtime:
