@@ -52,7 +52,7 @@ good_input = False
 while not good_input:
     #generate test case
     print "Generating test case: "
-    jobstr, resourcestr = gen_test_case(5, 5, 5, 100)
+    jobstr, resourcestr = gen_test_case(10, 10, 5, 100)
 
     print "Parsing input: "
     #jobs, resources = parse_input()
@@ -65,7 +65,9 @@ while not good_input:
 
 gen_dependencies(jobs, 2)
 
+print "Jobs:"
 print jobs
+print "Resources:"
 print resources
 
 total_cores = sum(resources.values())

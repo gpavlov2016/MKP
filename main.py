@@ -172,7 +172,7 @@ def update_resources(schedule, cores_availability, curtime, jobs):
                           + task + ", resource: " + resource + ", time: " + str(curtime)
                     break
                 else:
-                    core_avail_list[0] += dur
+                    core_avail_list[0] = curtime + dur
                     #scheduled_jobs.add(task)  # just for logging
                     print task + ": " + resource
 
@@ -209,7 +209,7 @@ def schedule_jobs(jobs, resources):
                 next_est = jobs[job]['est']
                 break
 
-        while (ready_jobs):
+        while ready_jobs:
             # build free resources dict
             free_resources = {}
             for (resource, core_avail_list) in cores_availability.items():
@@ -230,17 +230,18 @@ def schedule_jobs(jobs, resources):
                 #update resources:
                 update_resources(schedule, cores_availability, curtime, jobs)
                 ready_jobs = leftovers
-            flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
-            flat_core_avail.sort()
-            #advance time:
-            prevtime = curtime
-            for x in flat_core_avail:
-                if x > curtime:
-                    curtime = x
-                    break
-            update_est(leftovers, curtime - prevtime, jobs)
-            print "Time: " + str(curtime)
-            #TODO - possible heuristic predicting optimal increase in time
+            if  leftovers:
+                flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
+                flat_core_avail.sort()
+                #advance time:
+                prevtime = curtime
+                for x in flat_core_avail:
+                    if x > curtime:
+                        curtime = x
+                        break
+                update_est(leftovers, curtime - prevtime, jobs)
+                print "Time: " + str(curtime)
+                #TODO - possible heuristic predicting optimal increase in time
 
         #update_est(sorted_jobs, next_est - prevtime, jobs)
         curtime = next_est
