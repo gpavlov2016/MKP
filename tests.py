@@ -28,10 +28,10 @@ def gen_dependencies(jobs, maxnumparents):
         job = jobnames[i]
         jobs[job]['parents'] = set()
         for j in range(len(jobnames)):
-            if i < j and random.randint(0,1):
+            if i > j and random.randint(0,1):
                 parent = jobnames[j]
-                if jobs[job]['parents'] < maxnumparents:
-                    jobs[job]['parents'] = jobs[job]['parents'].add(parent)
+                if len(jobs[job]['parents']) < maxnumparents:
+                    jobs[job]['parents'].add(parent)
 
 
 from main import *
@@ -88,16 +88,20 @@ def create_and_run_test(numjobs, numresources):
     #compute metrics
     return sched_duration
 
+def mean(numbers):
+    return float(sum(numbers)) / max(len(numbers), 1)
+
 #random.seed(0)
 
-maxjobs = 15
-maxresources = 15
+maxjobs = 20
+maxresources = 20
+repetitions = 10
 sched_dur_matrix = [[0.0 for i in range(maxresources+1)] for j in range(maxjobs+1)]
 for numjobs in range(1, maxjobs+1):
     for numresources in range(1, maxresources+1):
         print 'Jobs: ' + str(numjobs) + ', Resources: ' + str(numresources)
-        dur = create_and_run_test(numjobs, numresources)
-        sched_dur_matrix[numjobs][numresources] = dur
+        durlist = [create_and_run_test(numjobs, numresources) for x in range(repetitions)]
+        sched_dur_matrix[numjobs][numresources] = mean(durlist)
 #print shcedulng duration matrix
 s = ""
 for numresources in range(1, maxresources + 1):

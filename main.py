@@ -84,9 +84,38 @@ def calc_est(jobs):
                 jobs[vertex]['est'] = 0
                 visited.add(vertex)
 
+def knapsack(capacity, tasks, jobs):
+    tasklist = list(tasks)
+    w = [jobs[task]['cores'] for task in tasklist]
+    m = [[0 for i in range(capacity+1)] for j in range(len(tasklist)+1)]
+    for j in range(capacity+1):
+        m[0][j] = 0
+
+    #populate the matrix
+    for i in range(1, len(tasklist)+1):
+        for j in range(capacity+1):
+            if w[i-1] > j:
+                m[i][j] = m[i-1][j]
+            else:
+                m[i][j] = max(m[i-1][j], m[i-1][j-w[i-1]] + w[i-1])
+
+    #reconstruct results (tasks names)
+    taskset = set()
+    i = len(tasklist)
+    maxw = max(w)
+    while i > 0:
+        if m[i][j] != m[i - 1][j]:
+            taskset.add(tasklist[i - 1])
+            j -= w[i - 1]
+        i -= 1
+    return taskset
+
 #capacity - int capacity of the bin
 #tasks - set of task names
 def pack(capacity, tasks, jobs):
+
+#    return knapsack(capacity, tasks, jobs)
+
     c = capacity
     p = set() #pack assignment
     if not tasks or not c:
@@ -116,7 +145,6 @@ def pack(capacity, tasks, jobs):
             maxpack = p1
 
     return maxpack
-
 
 #bins - set of resource names
 #tasks - set of task names
@@ -177,8 +205,8 @@ def update_resources(schedule, cores_availability, curtime, jobs):
                     break
                 else:
                     core_avail_list[0] = curtime + dur
-                    #scheduled_jobs.add(task)  # just for logging
-                    print task + ": " + resource
+            #scheduled_jobs.add(task)  # just for logging
+            print task + ": " + resource
 
 
 def update_est(tasks, howlong, jobs):
@@ -190,7 +218,6 @@ def schedule_jobs(jobs, resources):
     #sort jobs according to EST
     sorted_jobs = sorted(jobs.items(), key=lambda x: x[1]['est'])
     sorted_jobs = [k for (k,v) in sorted_jobs]
-    curtime = 0
 
     cores_availability = {}  # resource name --> list of availability times for each core
     for (resource, numcores) in resources.items():
@@ -198,6 +225,8 @@ def schedule_jobs(jobs, resources):
 
     schedule_log = []
     time_log = []
+    curtime = 0
+    print "Time: " + str(curtime)
     while sorted_jobs:
         # sort jobs according to EST
         sorted_jobs = sorted(sorted_jobs, key=lambda x: jobs[x]['est'])
@@ -222,34 +251,76 @@ def schedule_jobs(jobs, resources):
                 free_cores = sum([core_avail_list[i] <= curtime for i in range(len(core_avail_list))])
                 if free_cores > 0:
                     free_resources[resource] = free_cores
+            leftovers = set()
+            #Schedule available jobs to free resources
             if free_resources:
                 #schedule max amount of jobs:
                 schedule, leftovers = choose_bins(set(free_resources.keys()), ready_jobs, jobs, free_resources)
                 if schedule:
                     schedule_log.append(schedule)
                     time_log.append(curtime)
-
-                scheduled_jobs = set()
-                if schedule == None:
-                    print "Error: unable to schedule at time: " + str(curtime)
                 #update resources:
                 update_resources(schedule, cores_availability, curtime, jobs)
                 ready_jobs = leftovers
-            if  leftovers:
-                flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
-                flat_core_avail.sort()
-                #advance time:
-                prevtime = curtime
-                for x in flat_core_avail:
-                    if x > curtime:
-                        curtime = x
-                        break
+            flat_core_avail = [item for sublist in cores_availability.values() for item in sublist]
+            flat_core_avail.sort()
+            #advance time:
+            prevtime = curtime
+            for x in flat_core_avail:
+                if x > curtime:
+                    curtime = x
+                    print "Time: " + str(curtime)
+                    break
+            if leftovers:
                 update_est(leftovers, curtime - prevtime, jobs)
-                print "Time: " + str(curtime)
-                #TODO - possible heuristic predicting optimal increase in time
+            #TODO - possible heuristic predicting optimal increase in time
 
         #update_est(sorted_jobs, next_est - prevtime, jobs)
         curtime = next_est
         print "Time: " + str(curtime)
     return schedule_log, time_log
+
+
+from main import *
+from validation import *
+from visualization import *
+import time
+
+if sys.argv[0].find('main.py') != -1:
+    print "Parsing input: "
+    jobs, resources = parse_input()
+    #jobs, resources = parse_input(jobstr, resourcestr)
+
+    max_avail_cores = max(resources.values())
+    max_required_cores = max(jobs[x]['cores'] for x in jobs.keys())
+    if max_avail_cores < max_required_cores:
+        print "Job to big to fit on any resource: max available cores: " + \
+              max_avail_cores + ", required cores: " + max_required_cores
+
+    print "Jobs:"
+    print jobs
+    print "Resources:"
+    print resources
+
+    total_cores = sum(resources.values())
+    print 'Total cores: ' + str(total_cores)
+
+    print "Calculating EST: "
+    calc_est(jobs)
+    print "Scheduling: "
+    start = time.time()
+    schedule_log, time_log = schedule_jobs(jobs, resources)
+    end = time.time()
+    sched_duration = 1000*(end - start) #ms
+    print 'Scheduling took: ' + "%.2f" % (sched_duration) + 'ms'
+
+    start = time.time()
+    validate(schedule_log, time_log, jobs, resources)
+    end = time.time()
+    print 'Validation took: ' + "%.2f" % (1000*(end - start)) + 'ms'
+
+    start = time.time()
+    visualize_schedules(schedule_log, time_log, jobs, resources)
+    end = time.time()
+    print 'Visualization took: ' + "%.2f" % (1000*(end - start)) + 'ms'
 
