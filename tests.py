@@ -93,8 +93,8 @@ def mean(numbers):
 
 #random.seed(0)
 
-maxjobs = 20
-maxresources = 20
+maxjobs = 15
+maxresources = 15
 repetitions = 10
 sched_dur_matrix = [[0.0 for i in range(maxresources+1)] for j in range(maxjobs+1)]
 for numjobs in range(1, maxjobs+1):
