@@ -67,7 +67,7 @@ def calc_est(jobs):
         stack = [job]
         while stack:
             vertex = stack.pop()
-            if 'parents' in jobs[vertex]:
+            if 'parents' in jobs[vertex] and jobs[vertex]['parents']:
                 prnts_notvisited = [x for x in jobs[vertex]['parents'] if x not in visited]
                 prnts_visited = [x for x in jobs[vertex]['parents'] if x in visited]
                 if len(prnts_notvisited) == 0:
@@ -196,7 +196,6 @@ def schedule_jobs(jobs, resources):
     time_log = []
     while sorted_jobs:
         # sort jobs according to EST
-
         sorted_jobs = sorted(sorted_jobs, key=lambda x: jobs[x]['est'])
 
         #TODO - match resourcees and ready jobs
@@ -243,5 +242,8 @@ def schedule_jobs(jobs, resources):
             print "Time: " + str(curtime)
             #TODO - possible heuristic predicting optimal increase in time
 
+        #update_est(sorted_jobs, next_est - prevtime, jobs)
+        curtime = next_est
+        print "Time: " + str(curtime)
     return schedule_log, time_log
 

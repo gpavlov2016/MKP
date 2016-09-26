@@ -64,6 +64,8 @@ def validate(schedules, timeline, jobs, resources):
         if not 'parents' in jobs[job]:
             continue
         parents = jobs[job]['parents']
+        if not parents:
+            continue
         parents_finish_time = max([task_dict[x]['end'] for x in parents])
         start = task_dict[job]['start']
         if start < parents_finish_time:

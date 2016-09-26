@@ -21,8 +21,32 @@ def gen_test_case(numjobs, numresources, max_cores, max_exec_time):
 
     return jobstr, resourcestr
 
+def gen_dependencies(jobs, maxnumparents):
+    jobnames = jobs.keys()
+    jobsdepdict = {job: set([job]) for job in jobnames}
+    for (job, attr) in jobs.items():
+        numparents = random.randint(0, maxnumparents)
+        #prevent circular dependencies:
+        #parent shouldnt depend on the current job
+        dep_ok = False
+        while not dep_ok:
+            random.shuffle(jobnames)
+            parents = jobnames[0:numparents]
+            if any(job in jobsdepdict[x] for x in parents):
+                dep_ok = False
+            else:
+                dep_ok = True
+                break
+        attr['parents'] = set(parents)
+        for parent in parents:
+            jobsdepdict[job] = jobsdepdict[job].union(jobsdepdict[parent])
+        jobsdepdict[job] = jobsdepdict[job].union(set(parents))
+
+
 from main import *
 import time
+
+random.seed(0)
 
 good_input = False
 while not good_input:
@@ -38,6 +62,8 @@ while not good_input:
     max_required_cores = max(jobs[x]['cores'] for x in jobs.keys())
     if max_avail_cores >= max_required_cores:
         good_input = True
+
+gen_dependencies(jobs, 2)
 
 print jobs
 print resources
